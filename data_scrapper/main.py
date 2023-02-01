@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import tweepy
 from datetime import date, datetime
 
@@ -20,15 +21,28 @@ def get_twetts():
     field = ['context_annotations','entities','created_at']
     content = '(#NASDAQ100 OR #investing OR #forex OR #traiding OR #stocks OR #stokkmarket) OR economy OR stock OR market OR bonds  -is:retweet'
     query = f'{content}'
-
+    token = None
+    next_t = True
     cli = get_tw_cli()
-    tweets = cli.search_recent_tweets(query,
-                                      tweet_fields=field,
-                                      max_results=10,
-                                      start_time=datetime.strptime('2023-01-25', '%Y-%m-%d'))
+    dir_dump = get_dir_path()
+    file_path = os.path.join(dir_dump, 'tweets.json')
 
-    for tweet in tweets.data:
-        yield tweet
+    with open(file_path, 'w') as fh:
+        while next_t:
+            response = cli.search_recent_tweets(query,
+                                                tweet_fields=field,
+                                                max_results=100,
+                                                start_time=datetime.strptime('2023-01-26', '%Y-%m-%d'),
+                                                next_token=token)
+            if 'next_token' in response.meta:
+                next_token = response.meta['next_token']
+                for tweet in response.data:
+                    fh.write(json.dumps(get_line(tweet), default=json_serial) + "\n")
+
+            else:
+                next_t = False
+
+            time.sleep(4)
 
 
 def json_serial(obj):
@@ -47,8 +61,4 @@ def get_line(x):
     return line
 
 if __name__ == '__main__':
-    dir_dump = get_dir_path()
-    file_path = os.path.join(dir_dump, 'tweets.json')
-    with open(file_path, 'w') as fh:
-        for x in get_twetts():
-            fh.write(json.dumps(get_line(x), default=json_serial) + "\n")
+    get_twetts()
